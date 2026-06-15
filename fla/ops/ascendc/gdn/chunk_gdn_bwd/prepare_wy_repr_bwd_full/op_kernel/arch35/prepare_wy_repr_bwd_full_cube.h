@@ -450,8 +450,7 @@ public:
 };
 } // namespace Catlass::Gemm::Kernel
 
-template <typename kType, typename betaType
-, typename L1TileShape, typename L0TileShape>
+template <typename kType, typename betaType>
 class PrepareWyReprBwdFullProcess {
 public:
     /** @brief constructor */
@@ -465,6 +464,9 @@ public:
     __aicore__ inline void Init(const PrepareWyReprBwdFullTilingDataA5 &tiling);
 
 private:
+    template <class L1TileShape, class L0TileShape>
+    __aicore__ inline void ProcessImpl();
+
     uint64_t B = 0;
     uint64_t T = 0;
     uint64_t HV = 0;
@@ -501,20 +503,16 @@ private:
     uint64_t kktCVNum = 0;
 };
 
-template <typename kType, typename betaType
-, typename L1TileShape, typename L0TileShape>
-__aicore__ inline PrepareWyReprBwdFullProcess<kType, betaType
-, L1TileShape, L0TileShape>::PrepareWyReprBwdFullProcess(
+template <typename kType, typename betaType>
+__aicore__ inline PrepareWyReprBwdFullProcess<kType, betaType>::PrepareWyReprBwdFullProcess(
     GM_ADDR k_, GM_ADDR v_, GM_ADDR beta_, GM_ADDR A_, GM_ADDR dA_, GM_ADDR dw_, GM_ADDR du_, GM_ADDR g_,
     GM_ADDR cu_seqlens_, GM_ADDR chunk_indices_, GM_ADDR dk_, GM_ADDR dv_, GM_ADDR dbeta_, GM_ADDR dg_,
     GM_ADDR workspace_)
     : k(k_), v(v_), beta(beta_), A(A_), dA(dA_), dw(dw_), du(du_), g(g_), cu_seqlens(cu_seqlens_),
       chunk_indices(chunk_indices_), dk(dk_), dv(dv_), dbeta(dbeta_), dg(dg_), workspace(workspace_){};
 
-template <typename kType, typename betaType
-, typename L1TileShape, typename L0TileShape>
-__aicore__ void inline PrepareWyReprBwdFullProcess<kType, betaType
-, L1TileShape, L0TileShape>::Init(
+template <typename kType, typename betaType>
+__aicore__ void inline PrepareWyReprBwdFullProcess<kType, betaType>::Init(
     const PrepareWyReprBwdFullTilingDataA5 &tiling)
 {
     B = tiling.B;
@@ -539,10 +537,19 @@ __aicore__ void inline PrepareWyReprBwdFullProcess<kType, betaType
     return;
 }
 
-template <typename kType, typename betaType
-, typename L1TileShape, typename L0TileShape>
-__aicore__ void inline PrepareWyReprBwdFullProcess<kType, betaType
-, L1TileShape, L0TileShape>::Process()
+template <typename kType, typename betaType>
+__aicore__ void inline PrepareWyReprBwdFullProcess<kType, betaType>::Process()
+{
+    if (V == 256) {
+        ProcessImpl<Shape<_128, _256, _256>, Shape<_128, _256, _64>>();
+    } else {
+        ProcessImpl<Shape<_128, _128, _256>, Shape<_128, _128, _128>>();
+    }
+}
+
+template <typename kType, typename betaType>
+template <class L1TileShape, class L0TileShape>
+__aicore__ void inline PrepareWyReprBwdFullProcess<kType, betaType>::ProcessImpl()
 {
     //输入
     using LayoutTagA = layout::RowMajor;
